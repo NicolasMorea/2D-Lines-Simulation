@@ -15,17 +15,6 @@ namespace LineSimulation
 {
     public class DynamicLine : MonoBehaviour
     {
-        // protected Texture2D m_packedPointsTexture;
-        // protected static class ShaderParams
-        // {
-        //     public static int LineColor = Shader.PropertyToID("_LineColor");
-        //     public static int Thickness = Shader.PropertyToID("_Thickness");
-        //     public static int BackgroundColor = Shader.PropertyToID("_BackgroundColor");
-        //     public static int Origin = Shader.PropertyToID("_Origin");
-        //     public static int PointsCount = Shader.PropertyToID("_PointsCount");
-        //     public static int PackedPointsCount = Shader.PropertyToID("_PackedPointsCount");
-        //     public static int PackedPoints = Shader.PropertyToID("_PackedPoints");
-        // }
         #region Variables
         [SerializeField] Transform end;
         public bool hasEnd => end != null;
@@ -34,8 +23,6 @@ namespace LineSimulation
         public LineParams lineParams;
         public Vector2[] Points;
         public int ID, startIndex;
-        // public static int LineCount = 0;
-        // private int PointsCount = 16;
         [SerializeField, HideInInspector] private float straightPointsDist = 0.3f;
         [SerializeField, HideInInspector] private float lineLength = 5f;
 
@@ -65,15 +52,11 @@ namespace LineSimulation
                     Points[0] = Vector2.zero;
                     for (int i = 1; i < Points.Length; i++)
                     {
-                        // Vector2 dist = GravityManager.GetGravityAt(Points[i - 1]) * straightPointsDist;
-                        // dist = dist == Vector2.zero ? - transform.up * straightPointsDist : dist;
                         if (hasEnd) Points[i] = GetCurvePos(Vector2.zero, end.localPosition, lineLength * i / (Points.Length - 1), lineLength);
                         else Points[i] = Points[i - 1] - (Vector2)transform.up * straightPointsDist;
                     }
-                    // UpdateOffset();
                     break;
                 case DynamicLineEditType.Custom:
-                    // UpdateOffset();
                     break;
                 default:
                     return;
@@ -84,15 +67,6 @@ namespace LineSimulation
         {
             UpdateVisuals();
         }
-
-        // void UpdateOffset()
-        // {
-        //     Vector2 OffSet = Points[0] - (Vector2)transform.position;
-        //     for (int i = 0 ; i < Points.Count; i++)
-        //     {
-        //         Points[i] -= OffSet;
-        //     }
-        // }
 
         #endregion
 
@@ -120,21 +94,7 @@ namespace LineSimulation
             {
                 DynamicLineManager.lines.Add(this);
             }
-            // ID = LineCount;
-            // LineCount++;
         }
-
-        // void OnEnable()
-        // {
-        // }
-
-        // void OnDisable()
-        // {
-        //     if (!DynamicLineManager.Lines.Contains(this))
-        //     {
-        //         DynamicLineManager.Lines.Remove(this);
-        //     }
-        // }
 
         public void SetData(int Index, ref int nNodes, DynamicLineManager manager)
         {
@@ -182,7 +142,6 @@ namespace LineSimulation
         public Vector2 GetCurvePos(Vector2 start, Vector2 end, float t, float length)
         {
             Vector2 gravity = Vector2.up * 10f;
-            // Vector2 acceleration = gravity;
             Vector2 launchVelocity = ((end - start) / length) - gravity * length / 2.0f;
 
             return start + launchVelocity * t + gravity * t * t / 2.0f;
@@ -256,8 +215,6 @@ namespace LineSimulation
             Gizmos.color = Color.white;
             for (int i = 0; i < Points.Length; i++)
             {
-                // Gizmos.DrawWireSphere(Points[i], 0.1f);
-                //draw a wire circle in 2D
                 Handles.DrawWireDisc(Points[i] + (Vector2)transform.position, Vector3.forward, 0.1f);
             }
             for (int i = 0; i < Points.Length - 1; i++)

@@ -225,17 +225,6 @@ namespace LineSimulation
 
         private void SetRope()
         {
-            // accell = (Vector3)_accel;
-            // Vector3 deltaP = end.position - start.position;
-            // float b1 = Vector3.Dot(deltaP, accell) + vMax * vMax;
-            // float discriminant = b1 * b1 - Vector3.Dot(accell, accell) * Vector3.Dot(deltaP, deltaP);
-            // float T_min = Mathf.Sqrt((b1 - Mathf.Sqrt(discriminant)) * 2 / Vector3.Dot(accell, accell));
-            // float T_max = Mathf.Sqrt((b1 + Mathf.Sqrt(discriminant)) * 2 / Vector3.Dot(accell, accell));
-            // float length = Mathf.Sqrt(Mathf.Sqrt(4.0f * Vector3.Dot(deltaP, deltaP) / Vector3.Dot(accell, accell)));
-            // length = ((4.0f * Vector3.Dot(deltaP, deltaP)/3) / Vector3.Dot(accell, accell))/3;
-
-            // length = T_min + (T_max - T_min) * length;
-
             if (hasEnd)
             {
                 ropePositions = new Vector3[this.segmentNumber + 1];
@@ -273,10 +262,6 @@ namespace LineSimulation
 
         private void ApplyConstraint()
         {
-            //Constrant to Mouse
-            // RopeSegment firstSegment = this.ropeSegments[0];
-            // firstSegment.posNow = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            // this.ropeSegments[0] = firstSegment;
             if (hasStart)
             {
                 ropePositions[0] = start.position;
@@ -319,11 +304,6 @@ namespace LineSimulation
 
         private void DrawRope(bool drawObjects)
         {
-            // ropePositions = new Vector3[this.segmentNumber];
-            // for (int i = 0; i < this.segmentNumber; i++)
-            // {
-            //     ropePositions[i] = this.ropeSegments[i].posNow;
-            // }
 
             lineRenderer.positionCount = ropePositions.Length;
             lineRenderer.SetPositions(ropePositions);
@@ -383,23 +363,6 @@ namespace LineSimulation
             broken = true;
             bool hadAnEnd = hasEnd;
             hasEnd = false;
-
-            // length *= breakingPoint;
-            // GameObject newRope = new GameObject();
-            // newRope.transform.parent = transform.parent;
-            // newRope.name = "rope_fragment";
-            // LineRenderer lineRenderer = newRope.AddComponent<LineRenderer>();
-            // SortingGroup sortingGroup = newRope.AddComponent<SortingGroup>();
-            // Rope newRopeScript = newRope.AddComponent<Rope>();
-            // newRopeScript.start = end;
-            // newRopeScript.length = length;
-            // if (segmentNumber * breakingPoint < 5f)
-            // {
-            //     segmentNumber = 5;
-            // }
-            // else
-            // {
-            // }
             int oldLength = segmentNumber;
             segmentNumber = breakingPoint;
             List<Transform> keepingChildren = new List<Transform>();
@@ -408,8 +371,6 @@ namespace LineSimulation
             List<RopeAttachedObject> keepingAttachedObjects = new List<RopeAttachedObject>();
             List<Transform> keepingColliders = new List<Transform>();
             List<Transform> givingColliders = new List<Transform>();
-
-            // List<RopeAttachedListObject> givingAttachedRegularObjects = new List<RopeAttachedListObject>();
 
             for (int i = 0; i < attachedObjects.Count; i++)
             {
@@ -441,14 +402,7 @@ namespace LineSimulation
                     colliders[i].parent = null;
                     givingColliders.Add(colliders[i]);
                 }
-                else
-                {
-                    // Debug.Log("cuttting at " + i + " ieme collider");
-                }
             }
-            // Debug.Log("keeping " + keepingColliders.Count + " colliders");
-            // Debug.Log("giving " + givingColliders.Count + " colliders");
-            // Debug.Log("total " + colliders.Length + " colliders");
             start.parent = null;
             if (hadAnEnd)
             {
@@ -499,7 +453,6 @@ namespace LineSimulation
             start.parent = transform;
 
             end = null;
-            // storedLaunchVelocity = launchVelocity;
 
             storedRopePositions = new Vector3[segmentNumber + 1];
             for (int i = 0; i < segmentNumber + 1; i++)
@@ -521,8 +474,6 @@ namespace LineSimulation
 
         public void IsFragment(Vector3[] ropePoss, List<RopeAttachedObject> givingAttachedObjects, List<Transform> givingColliders, int newLength, bool hadAnEnd)
         {
-
-            // attachedRegularObjects = givingAttachedRegularObjects;
             hasEnd = false;
             if (hadAnEnd)
             {
@@ -535,7 +486,6 @@ namespace LineSimulation
                 hasStart = false;
                 StartCoroutine(DeleteFragment());
             }
-            //revserse the order of the colliders and transform them into an array
             colliders = givingColliders.ToArray();
             for (int i = 0; i < colliders.Length / 2; i++)
             {
@@ -553,15 +503,6 @@ namespace LineSimulation
             }
             end = null;
             int oldLength = segmentNumber + newLength;
-            // storedLaunchVelocity = launchVelocity;
-            // if (segmentNumber * (1f - breakingPoint) < 5f)
-            // {
-            //     segmentNumber = 5;
-            // }
-            // else
-            // {
-            //     segmentNumber = (int)(segmentNumber * (1f - breakingPoint));
-            // }
             segmentNumber = newLength;
 
             storedRopePositions = new Vector3[segmentNumber + 1];
@@ -599,7 +540,6 @@ namespace LineSimulation
             lineRenderer.endWidth = lineWidth;
             if (end != null)
             {
-                // Vector3 ropeEndPoint = end.position;
                 hasEnd = true;
             }
             else
@@ -623,33 +563,11 @@ namespace LineSimulation
             if (start != null && gravity != Vector2.zero && segmentNumber > 1)
             {
                 accell = (Vector3)(-gravity);
-                // accell = hasEnd ? accell : -accell;
                 SetRope();
-                // ClearObjects();
-                // CreateObjects();
                 DrawRope(false);
-                // Debug.Log("Rope validated");
             }
 
         }
 
     }
-    // #if UNITY_EDITOR
-    // [CustomEditor(typeof(Rope)),CanEditMultipleObjects]
-    // public class customRopeEditor : Editor
-    // {
-    //     public override void OnInspectorGUI()
-    //     {
-    //         base.OnInspectorGUI();
-    //         Rope rope = (Rope)target;
-
-    //         GUILayout.Space(15);
-    //         if (GUILayout.Button("Break"))
-    //         {
-    //             rope.Break(rope.breakingPoint);
-    //         }
-
-    //     }
-    // }
-    // #endif
 }

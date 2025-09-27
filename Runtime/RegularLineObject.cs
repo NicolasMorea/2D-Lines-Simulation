@@ -37,12 +37,6 @@ namespace LineSimulation
             if (max > Length) max = Length;
             if (min > Length) min = Length;
 
-            // if(obj.GetComponent<LineObject>() == null)
-            // {
-            //     Debug.LogWarning("RegularLineObject : " + obj.name + " is not a LineObject, it will not be attached to the line", this);
-            //     return;
-            // }
-
             //* remove children of type lineObject
             LineObject[] lineObjects = GetComponentsInChildren<LineObject>();
             foreach (LineObject lineObject in lineObjects)

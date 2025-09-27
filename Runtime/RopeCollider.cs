@@ -19,31 +19,5 @@ namespace LineSimulation
             this.position = _position;
             this.rope = _rope;
         }
-
-        // void OnTriggerEnter2D(Collider2D other)
-        // {
-        //     //Debug.Log(other.gameObject.layer);
-        //     if (other.gameObject.layer == 13)
-        //     {
-        //         rope.BreakRope(position);
-        //     }
-        // }
-        // public override void Interact(Collider2D other)
-        // {
-        //     this.rope.BreakRope(this.position);
-        //     base.Interact(other);
-        // }
-        // private void Update()
-        // {
-        //     // if((player.position - transform.position).magnitude > 10)
-        //     // {
-        //     //     return;
-        //     // }
-        //     if(Overlap() != null)
-        //     {
-        //         // Debug.Log("breaking");
-        //         this.rope.BreakRope(this.position);
-        //     }
-        // }
     }
 }

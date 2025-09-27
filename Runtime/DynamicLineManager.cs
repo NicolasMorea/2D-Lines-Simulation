@@ -17,20 +17,16 @@ namespace LineSimulation
     {
         #region Variables
         public bool debug;
-        // private Vector3 pivotPosition;
 
         [Header("Data")]
         public int nNodesPerLine = 16;
         public int nLines = 256;
         public int nColliders;
         public float gravityForce = 0.1f;
-        // public static int nBufferLine = 256;
-        // public static int nTotalNodes;
         public float simulationSpeed, strengthOfForces;
         public float windForce = 0.1f;
 
         [Header("Compute shader")]
-        // [SerializeField] private  Tilemap gravityTilemap;
         [SerializeField] public ComputeShader shader;
         [SerializeField] public RenderTexture gravityRenderTexture;
         [SerializeField] public RenderTexture velocityTexture;
@@ -40,14 +36,9 @@ namespace LineSimulation
         public LineParams[] lineParamsArray;
         public Vector2[] linePivotsArray;
         public Vector2[] lineEndsPivotsArray;
-        // public BoxColliderData[] boxCollidersArray;
         public float[] debugArray;
-        // static public circleCollider[] circleCollidersArray;
         public static List<DynamicLine> lines;
-        // public static List<BoxCollider2D> Colliders = new List<BoxCollider2D>();
-        // [SerializeField] private float tileSize = 1;
 
-        // [Header("Kernels (for Debug)")]
         private int kiCalc, kiVelShare, kiInteractionWithColliders, kiCalcApply, kiOneThreadAction;
         private int kiVisInternodeLines, kiClearTexture, kiPixelsToTexture, kiClearPixels;
         private ComputeBuffer lineNodesBuffer;
@@ -56,31 +47,12 @@ namespace LineSimulation
         private ComputeBuffer lineEndsPivotsBuffer;
         private ComputeBuffer visBuffer;
 	    private ComputeBuffer debugBuffer;
-        // public ComputeBuffer boxCollidersBuffer;
-        // public Texture2D gravityTexture;
-        
-        // static public ComputeBuffer circleCollidersBuffer;
         [Header("Rendering (WIP)")]
         public RenderTexture renderTexture;
-        // public UnityEngine.UI.Image outputImage;
 
         #endregion
-        // static int ComputeTotalNodes()
-        // {
-        //     int nTotalNodes = 0;
-        //     nLines = 0;
-        //     foreach (DynamicLine line in Lines)
-        //     {
-        //         nTotalNodes += line.Points?.Count;
-        //         if(line) nLines += 1;
-                 
-        //         line.startIndex = nTotalNodes;
-        //         // line.ID = nLines;
-        //     }
-        //     return nTotalNodes;
-        // }
         #region Init
-        private void Start() //TODO Reset when switching scene
+        private void Start()
         {
             if(shader == null) 
             {
@@ -97,7 +69,6 @@ namespace LineSimulation
             InitTexture();
             InitData();
             InitBuffers();
-            // InitGravity();
             InitShader();
         }
 
@@ -111,29 +82,16 @@ namespace LineSimulation
             renderTexture = new RenderTexture(1024, 1024, 32);
             renderTexture.enableRandomWrite = true;
             renderTexture.Create();
-
-            // if(outputImage == null) return;
-            // outputImage.color = new Color(1, 1, 1, 1);
-            // outputImage.material.mainTexture = renderTexture;
-            // outputImage.type = UnityEngine.UI.Image.Type.Simple;
-            // outputImage.gameObject.SetActive(true);
         }
         
         void InitData()
         {
             nLines = lines.Count;
-            // nColliders = Colliders.Count;
 
             lineNodesArray = new LineNode[nLines * nNodesPerLine];
             lineParamsArray = new LineParams[nLines];
             linePivotsArray = new Vector2[nLines];
             lineEndsPivotsArray = new Vector2[nLines];
-            // boxCollidersArray = new BoxColliderData[nColliders];
-
-            // foreach (DynamicLine line in Lines)
-            // {
-            //     line.SetData();
-            // }
 
             int nNodes = 0;
             for (int i = 0; i < lines.Count; i++)
@@ -141,22 +99,11 @@ namespace LineSimulation
                 lines[i]?.SetData(i, ref nNodes, this);
             }
 
-            // for(int i = 0; i < Colliders.Count; i++)
-            // {
-            //     boxCollidersArray[i].position = Colliders[i].transform.position;
-            //     boxCollidersArray[i].halfWidth = Colliders[i].size.x / 2;
-            //     boxCollidersArray[i].halfHeight = Colliders[i].size.y / 2;
-            // }
-
-            // nLines = Lines.Count;
-            
-
             if(debug) Debug.Log( "Number of Lines : " + lines.Count + " / " + nLines);
             if(debug) Debug.Log( "Total of " + nNodes + " nodes");
 
             debugArray = new float[nLines * nNodesPerLine];
             debugArray[0] = -1;
-
 
         }
 
@@ -174,59 +121,26 @@ namespace LineSimulation
             lineEndsPivotsBuffer = new ComputeBuffer(lineEndsPivotsArray.Length, 8);
             lineEndsPivotsBuffer.SetData(lineEndsPivotsArray);
 
-            // boxCollidersBuffer = new ComputeBuffer(boxCollidersArray.Length, 4 * 8);
-            // boxCollidersBuffer.SetData(boxCollidersArray);
-
 		    debugBuffer = new ComputeBuffer(debugArray.Length, 4);
             debugBuffer.SetData(debugArray);
 
             visBuffer = new ComputeBuffer(1024 * 1024, 4);
         }
 
-        // private void InitGravity()
-        // {
-            // Dictionary<TileBase, Vector2> gravityDict = GravityManager.tileGravity;
-            // Debug.Log("Gravity dict : " + gravityDict.Count + gravityDict);
-            // MapMethods.CreateGravityTexture(gravityTilemap, gravityDict, ref gravityTexture);
-            // Debug.Log("Texture created" + gravityTexture.width + " " + gravityTexture.height + " & min tilemap : " + gravityTilemap.cellBounds.min);
-        // }
-
         void InitShader()
         {
-            // shader.SetInt("gravityForce", );
-
-            // shader.SetInt("gravityTilemapWidth", gravityTexture.width);
-            // shader.SetInt("gravityTilemapHeight", gravityTexture.height);
-            // shader.SetFloat("gravityTileSize", tileSize);
-            // Vector2 gravityOffset = (Vector2) (- gravityTilemap.transform.position - gravityTilemap.cellBounds.min);
-            // shader.SetVector("gravityOffset", gravityOffset);
-
             shader.SetInt("nNodesPerLine", nNodesPerLine);
             shader.SetInt("nLines", nLines);
             shader.SetInt("nBoxColliders", nColliders);
-            // shader.SetInt("nCircleColliders", circleCollidersArray.Length);
-            // shader.SetFloat("internodeDistance", nodeStepSize);
-            // shader.SetFloats("pivotDestination", pivotPosition);
             shader.SetFloat("dPosRate", simulationSpeed);
             shader.SetFloat("dVelRate", strengthOfForces);
             shader.SetFloat("gravityForce", gravityForce);
             shader.SetFloat("windForce", windForce);
             shader.SetInt("F_TO_I", 2 << 17);
             shader.SetFloat("I_TO_F", 1f / (2 << 17));
-            // shader.SetInt("nCircleColliders", nCircleColliders);
-
-
-            //* for world position to texture position computation : 
-            // Matrix4x4 viewMatrix = Camera.main.worldToCameraMatrix;
-            // Matrix4x4 projMatrix = GL.GetGPUProjectionMatrix(Camera.main.projectionMatrix, false);
-            // Matrix4x4 viewProjMatrix = projMatrix * viewMatrix;
-
-            // shader.SetMatrix("viewProjMatrix", viewProjMatrix);
 
             Vector2 screenRes = new Vector2(gravityRenderTexture.width, gravityRenderTexture.height);
             shader.SetVector("gravityScreenResolution", screenRes);
-
-            //* Kernels
 
             kiCalc = shader.FindKernel("calc");
             shader.SetBuffer(kiCalc, "lineNodesBuffer", lineNodesBuffer);
@@ -238,22 +152,11 @@ namespace LineSimulation
             shader.SetBuffer(kiVelShare, "lineParamsBuffer", lineParamsBuffer);
             shader.SetBuffer(kiVelShare, "debugBuffer", debugBuffer);
 
-            // kiInteractionWithColliders = shader.FindKernel("interactionWithBoxColliders");
-            // shader.SetBuffer(kiInteractionWithColliders, "lineNodesBuffer", lineNodesBuffer);
-            // shader.SetBuffer(kiInteractionWithColliders, "debugBuffer", debugBuffer);
-            // shader.SetBuffer(kiInteractionWithColliders, "boxCollidersBuffer", boxCollidersBuffer);
-
-            // kiInteractionWithColliders = shader.FindKernel("interactionWithColliders");
-            // shader.SetBuffer(kiInteractionWithColliders, "hairNodesBuffer", hairNodesBuffer);
-            // shader.SetBuffer(kiInteractionWithColliders, "debugBuffer", debugBuffer);
-            // shader.SetBuffer(kiInteractionWithColliders, "circleCollidersBuffer", circleCollidersBuffer);
-
             kiCalcApply = shader.FindKernel("calcApply");
             shader.SetBuffer(kiCalcApply, "lineNodesBuffer", lineNodesBuffer);
             shader.SetBuffer(kiCalcApply, "lineParamsBuffer", lineParamsBuffer);
             shader.SetBuffer(kiCalcApply, "linePivotsBuffer", linePivotsBuffer);
             shader.SetBuffer(kiCalcApply, "lineEndsPivotsBuffer", lineEndsPivotsBuffer);
-            // shader.SetTexture(kiCalcApply, "GravityMap", gravityTexture);
             shader.SetTexture(kiCalcApply, "GravityRT", gravityRenderTexture);
             shader.SetTexture(kiCalcApply, "VelocityRT", velocityTexture);
             shader.SetBuffer(kiCalcApply, "debugBuffer", debugBuffer);
@@ -275,11 +178,8 @@ namespace LineSimulation
 
             kiOneThreadAction = shader.FindKernel("oneThreadAction");
             shader.SetBuffer(kiOneThreadAction, "lineNodesBuffer", lineNodesBuffer);
-            // shader.SetBuffer(kiOneThreadAction, "lineParamsBuffer", lineParamsBuffer);
             shader.SetBuffer(kiOneThreadAction, "linePivotsBuffer", linePivotsBuffer);
-            // shader.SetBuffer(kiOneThreadAction, "lineNodesBuffer", lineNodesBuffer);
             shader.SetBuffer(kiOneThreadAction, "debugBuffer", debugBuffer);
-            // shader.SetBuffer(kiOneThreadAction, "pivotActual", pivotActualBuffer);
         }
 
         #endregion
@@ -313,8 +213,6 @@ namespace LineSimulation
 
         private void SendMainPositions()
         {
-            //* for debug
-            //TODO remove when not needed anymore
             shader.SetFloat("dPosRate", simulationSpeed);
             shader.SetFloat("dVelRate", strengthOfForces);
             shader.SetFloat("gravityForce", gravityForce);
@@ -335,7 +233,6 @@ namespace LineSimulation
                     update = true;
                     linePivotsArray[i] = lines[i].transform.position;
                 }
-                // linePivotsArray[i] = Lines[i].transform.position;
             }
             if(update) 
             {
@@ -355,7 +252,6 @@ namespace LineSimulation
                     update = true;
                     lineEndsPivotsArray[i] = lines[i].GetEnd();
                 }
-                // linePivotsArray[i] = Lines[i].transform.position;
             }
             if(update) 
             {
@@ -368,51 +264,25 @@ namespace LineSimulation
             Matrix4x4 viewProjMatrix = projMatrix * viewMatrix;
 
             shader.SetMatrix("viewProjMatrix", viewProjMatrix);
-
-            // update = false;
-            // for (int i = 0; i < boxCollidersArray.Length; i++)
-            // {
-            //     if((Vector2)Colliders[i].transform.position != boxCollidersArray[i].position)
-            //     {
-            //         update = true;
-            //         boxCollidersArray[i].position = Colliders[i].transform.position;
-            //     }
-            // }
-            // if(update) 
-            // {
-            //     boxCollidersBuffer.SetData(boxCollidersArray);
-            //     shader.SetBuffer(kiInteractionWithColliders, "boxCollidersBuffer", boxCollidersBuffer);
-            // }
         }
 
         private void doShaderStuff()
         {
             int nLineThreadGroups = (nLines - 1) / 16 + 1;
             int nNodesThreadGroups = (nNodesPerLine - 1) / 8 + 1;
-
-            // shader.SetFloats("pivotDestination", new float[] { pivotPosition.x, pivotPosition.y, pivotPosition.z });
-            // lineNodesBuffer.SetData(lineNodesArray);
-            // circleCollidersBuffer.SetData(circleCollidersArray);
-
             // Dispatch kernels
-            // Debug.Log("Dispatching Kernels");
             for (int i = 0; i < 40; i++)
             {
                 shader.Dispatch(kiVelShare, nLineThreadGroups, nNodesThreadGroups, 1);
                 shader.Dispatch(kiCalc, nLineThreadGroups, nNodesThreadGroups, 1);
-                // shader.Dispatch(kiInteractionWithColliders, nLineThreadGroups, nNodesThreadGroups, 1);
                 shader.Dispatch(kiCalcApply, nLineThreadGroups, nNodesThreadGroups, 1);
-                // shader.Dispatch(kiInteractionWithColliders, nLineThreadGroups, nNodesThreadGroups, 1);
                 shader.Dispatch(kiOneThreadAction, nLines, 1, 1);
             }
-            // Debug.Log("Dispatching Kernels Otra vez");
-            // circleCollidersBuffer.GetData(circleCollidersArray);
+            
             shader.Dispatch(kiVisInternodeLines, nLineThreadGroups, nNodesThreadGroups, 1);
             shader.Dispatch(kiClearTexture, 32, 32, 1);
             shader.Dispatch(kiPixelsToTexture, 32, 32, 1);
             shader.Dispatch(kiClearPixels, 32, 32, 1);
-            // Debug.Log("Dispatching Kernels Done");
-            // lineNodesBuffer.GetData(lineNodesArray);
         }
 
         #endregion
@@ -444,12 +314,6 @@ namespace LineSimulation
                 return;
             }
 
-            // Lines[ID].Points = new Vector2[nNodesPerLine];
-
-            // for (int i = 0; i < UpdatedPos.Length; i++)
-            // {
-            //     Lines[ID].Points[i] = new Vector2(UpdatedPos.x, UpdatedPos.y);
-            // }
             LineNode[] FirstPart;
             LineNode[] SecondPart;
             (FirstPart, SecondPart) = GetSlicedLineNodes(OriginalLine, NodeID - LineID * nNodesPerLine);
@@ -483,16 +347,6 @@ namespace LineSimulation
 
             nLines += 1;
 
-            // shader.SetInt("nLines", nLines);
-
-            // lineNodesBuffer = new ComputeBuffer(lineNodesArray.Length, 4 * 8);
-            // lineNodesBuffer.SetData(lineNodesArray);
-
-            // lineParamsBuffer = new ComputeBuffer(lineParamsArray.Length, 4 * 8);
-            // lineParamsBuffer.SetData(lineParamsArray);
-
-            // linePivotsBuffer = new ComputeBuffer(linePivotsArray.Length, 8);
-            // linePivotsBuffer.SetData(linePivotsArray);
             InitBuffers();
             InitShader();
         }
@@ -502,18 +356,6 @@ namespace LineSimulation
         {
             float OldLength = 0.0f;
             float NewLength = 0.0f;
-
-            // Vector2[] OriginalPoints = PointsOf(originalLine);
-
-            // for (int i = 1 ; i < originalLine.Length ; i++)
-            // {
-            //     OldLength += Vector2.Distance(OriginalPoints[i-1], OriginalPoints[i]);
-
-            //     if(i <= CutNode)
-            //     {
-            //         NewLength += Vector2.Distance(OriginalPoints[i - 1], OriginalPoints[i]);
-            //     }
-            // }
 
             for (int i = 0 ; i < originalLine.Length -1; i++)
             {
@@ -548,14 +390,12 @@ namespace LineSimulation
                 Debug.Log("Part2 at " + i + " is " + Pos(Part2[i]) + " with target dist " + Part2[i].targetDist);
             }
 
-            // Points = Part1;
             return (Part1, Part2);
         }
 
 
         public static LineNode GetNodeAtLength(float Length, LineNode[] Points)
         {
-            // index i = 0;
             float remaining = Length;
             LineNode node = new LineNode();
 
@@ -598,7 +438,6 @@ namespace LineSimulation
 
         public static int GetNodeIndexAtLength(float Length, Vector2[] points)
         {
-            // index i = 0;
             float remaining = Length;
 
             for (int i = 0 ; i < points.Length - 1; i++)
@@ -611,7 +450,6 @@ namespace LineSimulation
                 remaining -= segment;
             }
 
-            // Debug.Log("trying to seek point beyond line end");
             return points.Length - 1;
         }
 
@@ -722,36 +560,6 @@ namespace LineSimulation
             }
         }
         #endif
-
-    //     #region Jobs
-
-    //     [BurstCompile]
-    //     struct GravityJob : IJobParallelFor
-    //     {
-    //         public NativeArray<LineNode> lineNodes;
-
-    //         public void Execute(int index)
-    //         {
-    //             Fetch the current line node
-    //             LineNode line = lineNodes[index];
-
-    //             // Get gravity for this node's position
-    //             Vector2 gravity = GravityManager.GetGravityDirection(new Vector2(line.x, line.y));
-                
-    //             // Determine intGravity based on the direction of the gravity vector
-    //             int intGravity = 0;
-    //             if (gravity.y > 0) intGravity = 1;
-    //             else if (gravity.x > 0) intGravity = 2;
-    //             else if (gravity.x < 0) intGravity = 3;
-
-    //             // Assign the computed gravity back to the line node
-    //             line.gravity = intGravity;
-
-    //             // Store the updated line node back into the array
-    //             lineNodes[index] = line;
-    //         }
-    //     }
-    // #endregion
     }
 
 }
