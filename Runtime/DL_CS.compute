@@ -52,7 +52,6 @@ RWStructuredBuffer<float2> lineEndsPivotsBuffer;
 
 RWStructuredBuffer<uint> visBuffer;
 RWStructuredBuffer<float> debugBuffer;
-// RWStructuredBuffer<circleCollider> circleCollidersBuffer;
 RWStructuredBuffer<boxCollider> boxCollidersBuffer;
 RWTexture2D<float4> renderTexture;
 
@@ -72,9 +71,6 @@ float gravityTileSize;
 unsigned int nNodesPerLine;
 unsigned int nLines;
 unsigned int nBoxColliders;
-// int nCircleColliders;
-// float internodeDistance;
-// float2 pivotDestination;
 float dPosRate;				// simulation speed
 float dVelRate;				// strength of forces
 float gravityForce;
@@ -86,8 +82,6 @@ float I_TO_F;				// int to float
 [numthreads(16,8,1)]
 void calc (uint3 id : SV_DispatchThreadID)
 {
-	// debugBuffer[0] = nLines;
-	// debugBuffer[1] = nNodesPerLine;
 	if (id.x >= nLines)
 	return;
 	if (id.y >= nNodesPerLine)
@@ -95,7 +89,6 @@ void calc (uint3 id : SV_DispatchThreadID)
 	if (id.y == nNodesPerLine - 1)
 	return;
 	
-	// debugBuffer[id.x * nNodesPerLine + id.y] = id.x * nNodesPerLine + id.y;
 	int nodeIndex, nodeIndex2;
 	float currentDistance, fixImpulse;
 	LineNode node, node2, node3;
@@ -113,9 +106,6 @@ void calc (uint3 id : SV_DispatchThreadID)
 	fixImpulse = node.targetDist - currentDistance;		// < 0: too long, > 0 too short
 	fixImpulse = clamp(fixImpulse, -8, 8);
 	dv = - normalize(v) * fixImpulse * 5;
-	// dv = normalize(v) * pow(fixImpulse, 2);
-	// if (fixImpulse > 0)
-	// 	dv *= -1;
 
 	// flexibility related source of movement
 	dvFlex = float2(0, 0);
@@ -149,8 +139,6 @@ void velShare (uint3 id : SV_DispatchThreadID)
 	float2 v, dv, dvt;
 	nodeIndex = id.x * nNodesPerLine + id.y;
 	nodeIndex2 = nodeIndex + 1;
-	// debugBuffer[0] = 2;
-	// debugBuffer[nodeIndex] = 1;
 	node = lineNodesBuffer[nodeIndex];
 	node2 = lineNodesBuffer[nodeIndex2];
 
@@ -169,44 +157,6 @@ void velShare (uint3 id : SV_DispatchThreadID)
 	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvx, -(int)(F_TO_I * dv.x));
 	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvy, -(int)(F_TO_I * dv.y));
 }
-
-// #pragma kernel interactionWithColliders
-// [numthreads(16,8,1)]
-// void interactionWithColliders (uint3 id : SV_DispatchThreadID){
-// 	if (id.x >= nLines)
-// 		return;
-// 	if (id.y >= nNodesPerLine)
-// 		return;
-// 	int i, nodeIndex;
-// 	float currentDistance, dotResult;
-// 	LineNode node;
-// 	float2 v, newPos, velToCenterComponent;
-// 	nodeIndex = id.x * nNodesPerLine + id.y;
-// 	node = lineNodesBuffer[nodeIndex];
-
-// 	// interaction with circle colliders
-// 	i = 0;
-// 	while (i < nCircleColliders){
-// 		v = float2(node.x - circleCollidersBuffer[i].x, node.y - circleCollidersBuffer[i].y);		// vector: circle collider center -> node
-// 		if (distance(float2(0, 0), v) < circleCollidersBuffer[i].r){
-// 			// move the node outside the circle
-// 			newPos = float2(circleCollidersBuffer[i].x, circleCollidersBuffer[i].y) + normalize(v) * circleCollidersBuffer[i].r;
-// 			lineNodesBuffer[nodeIndex].x = newPos.x;
-// 			lineNodesBuffer[nodeIndex].y = newPos.y;
-// 			// remove from the node's velocity a part: projection to the node-center line, facing center; add this vel part to collider's dv
-// 			dotResult = dot(float2(node.vx, node.vy), normalize(v));
-// 			if (dotResult < 0){
-// 				velToCenterComponent = normalize(v) * dotResult;
-// 				lineNodesBuffer[nodeIndex].vx -= velToCenterComponent.x;
-// 				lineNodesBuffer[nodeIndex].vy -= velToCenterComponent.y;
-// 				// add this to collider's vel
-// 				InterlockedAdd(circleCollidersBuffer[i].dvx, (int)(velToCenterComponent.x * 10000));
-// 				InterlockedAdd(circleCollidersBuffer[i].dvy, (int)(velToCenterComponent.y * 10000));
-// 			}
-// 		}
-// 		i++;
-// 	}
-// }
 
 #pragma kernel interactionWithBoxColliders
 [numthreads(16,8,1)]
@@ -347,8 +297,6 @@ void calcApply (uint3 id : SV_DispatchThreadID)
 	}
 
 	
-	// float value = GravityMap.Load(int3(lineNodesBuffer[nodeIndex].x + gravityOffset.x, lineNodesBuffer[nodeIndex].y + gravityOffset.y, 0)).r;
-	// float2 gravity = ComputeExternalForces(value) * 0.1;
 	float3 worldPos = float3(lineNodesBuffer[nodeIndex].x, lineNodesBuffer[nodeIndex].y, 0);
 	
 	float2 forces = float2(0, 0);
