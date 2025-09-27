@@ -1,0 +1,14 @@
+{
+  "name": "com.overthought-games.2d-lines",
+  "version": "0.0.0",
+  "displayName": "2D Lines Simulation",
+  "description": "2DLines is a Unity package that provides a simple way to create and manage 2D lines that react to physics.",
+  "unity": "2020.3",
+  "documentationUrl": "https://github.com/NicolasMorea/2D-Lines-Simulation",
+  "changelogUrl": "https://github.com/NicolasMorea/2D-Lines-Simulation/releases",
+  "licensesUrl": "https://github.com/NicolasMorea/2D-Lines-Simulation/blob/master/LICENSE",
+  "author": {
+    "name": "Overthought Games",
+    "url": "https://github.com/NicolasMorea"
+  }
+}
