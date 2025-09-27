@@ -1,0 +1,454 @@
+struct LineNode
+{
+	float x;
+	float y;
+	float vx;
+	float vy;
+	int dvx;
+	int dvy;
+	float targetDist;
+	int parent;
+};
+
+struct LineParams
+{
+    float2 worldPos;
+    float stiffness;
+    float velocityScale;
+    float2 windForce;
+	float lineZ;
+    float dummy;
+};
+
+struct circleCollider
+{
+	float x;
+	float y;
+	float r;
+	int dvx;
+	int dvy;
+	int dummy1;
+	int dummy2;
+	int dummy3;
+};
+
+struct boxCollider
+{
+	float x;
+	float y;
+	float halfWidth;
+	float halfHeight;
+	int dummy1;
+	int dummy2;
+	int dummy3;
+	int dummy4;
+};
+
+
+RWStructuredBuffer<LineNode> lineNodesBuffer;
+RWStructuredBuffer<LineParams> lineParamsBuffer;
+RWStructuredBuffer<float2> linePivotsBuffer;
+RWStructuredBuffer<float2> lineEndsPivotsBuffer;
+
+RWStructuredBuffer<uint> visBuffer;
+RWStructuredBuffer<float> debugBuffer;
+// RWStructuredBuffer<circleCollider> circleCollidersBuffer;
+RWStructuredBuffer<boxCollider> boxCollidersBuffer;
+RWTexture2D<float4> renderTexture;
+
+Texture2D<float4> VelocityRT;
+float windForce;
+
+Texture2D<float4> GravityRT;
+float2 gravityScreenResolution;
+float4x4 viewProjMatrix;
+
+Texture2D<float> GravityMap;
+int gravityTilemapWidth;
+int gravityTilemapHeight;
+float2 gravityOffset;
+float gravityTileSize;
+
+unsigned int nNodesPerLine;
+unsigned int nLines;
+unsigned int nBoxColliders;
+// int nCircleColliders;
+// float internodeDistance;
+// float2 pivotDestination;
+float dPosRate;				// simulation speed
+float dVelRate;				// strength of forces
+float gravityForce;
+
+int F_TO_I;					// float to int
+float I_TO_F;				// int to float
+
+#pragma kernel calc
+[numthreads(16,8,1)]
+void calc (uint3 id : SV_DispatchThreadID)
+{
+	// debugBuffer[0] = nLines;
+	// debugBuffer[1] = nNodesPerLine;
+	if (id.x >= nLines)
+	return;
+	if (id.y >= nNodesPerLine)
+	return;
+	if (id.y == nNodesPerLine - 1)
+	return;
+	
+	// debugBuffer[id.x * nNodesPerLine + id.y] = id.x * nNodesPerLine + id.y;
+	int nodeIndex, nodeIndex2;
+	float currentDistance, fixImpulse;
+	LineNode node, node2, node3;
+	float2 v, vUp, dv, dvFlex;
+	nodeIndex = id.x * nNodesPerLine + id.y;
+	nodeIndex2 = nodeIndex + 1;
+	// debugBuffer[0] = 2;
+	node = lineNodesBuffer[nodeIndex];
+	node2 = lineNodesBuffer[nodeIndex2];
+
+    if(node2.parent < 0) return;
+
+	v = float2(node2.x - node.x, node2.y - node.y);
+	currentDistance = distance(float2(0, 0), v);
+	fixImpulse = node.targetDist - currentDistance;		// < 0: too long, > 0 too short
+	fixImpulse = clamp(fixImpulse, -8, 8);
+	dv = - normalize(v) * fixImpulse * 5;
+	// dv = normalize(v) * pow(fixImpulse, 2);
+	// if (fixImpulse > 0)
+	// 	dv *= -1;
+
+	// flexibility related source of movement
+	dvFlex = float2(0, 0);
+	if (id.y != 0){
+		node3 = lineNodesBuffer[nodeIndex - 1];
+		vUp = float2(node3.x - node.x, node3.y - node.y);
+		dvFlex = 0.05 * (v + vUp);
+		InterlockedAdd(lineNodesBuffer[nodeIndex - 1].dvx, -(int)(F_TO_I * dvFlex.x));
+		InterlockedAdd(lineNodesBuffer[nodeIndex - 1].dvy, -(int)(F_TO_I * dvFlex.y));
+	}
+
+	InterlockedAdd(lineNodesBuffer[nodeIndex].dvx, (int)(F_TO_I * (dv.x + 2 * dvFlex.x)));
+	InterlockedAdd(lineNodesBuffer[nodeIndex].dvy, (int)(F_TO_I * (dv.y + 2 * dvFlex.y)));
+	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvx, (int)(F_TO_I * (-dv.x - dvFlex.x)));
+	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvy, (int)(F_TO_I * (-dv.y - dvFlex.y)));
+}
+
+#pragma kernel velShare
+[numthreads(16,8,1)]
+void velShare (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= nLines)
+		return;
+	if (id.y >= nNodesPerLine)
+		return;
+	if (id.y == nNodesPerLine - 1)
+		return;
+	int nodeIndex, nodeIndex2;
+	LineNode node, node2;
+	float dotResult;
+	float2 v, dv, dvt;
+	nodeIndex = id.x * nNodesPerLine + id.y;
+	nodeIndex2 = nodeIndex + 1;
+	// debugBuffer[0] = 2;
+	// debugBuffer[nodeIndex] = 1;
+	node = lineNodesBuffer[nodeIndex];
+	node2 = lineNodesBuffer[nodeIndex2];
+
+    if(node2.parent < 0) return;
+
+	v = float2(node2.x - node.x, node2.y - node.y);			// 1 -> 2 vector
+	dv = float2(node.vx - node2.vx, node.vy - node2.vy);	// 1 -> 2 relative speed
+	dotResult = dot(dv, normalize(v));
+	dvt = dotResult * normalize(v);							// tangential component of relative velocity
+	dvt *= -0.004;
+	dv *= -0.0012;
+	dv += dvt;
+
+	InterlockedAdd(lineNodesBuffer[nodeIndex].dvx, (int)(F_TO_I * dv.x));
+	InterlockedAdd(lineNodesBuffer[nodeIndex].dvy, (int)(F_TO_I * dv.y));
+	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvx, -(int)(F_TO_I * dv.x));
+	InterlockedAdd(lineNodesBuffer[nodeIndex2].dvy, -(int)(F_TO_I * dv.y));
+}
+
+// #pragma kernel interactionWithColliders
+// [numthreads(16,8,1)]
+// void interactionWithColliders (uint3 id : SV_DispatchThreadID){
+// 	if (id.x >= nLines)
+// 		return;
+// 	if (id.y >= nNodesPerLine)
+// 		return;
+// 	int i, nodeIndex;
+// 	float currentDistance, dotResult;
+// 	LineNode node;
+// 	float2 v, newPos, velToCenterComponent;
+// 	nodeIndex = id.x * nNodesPerLine + id.y;
+// 	node = lineNodesBuffer[nodeIndex];
+
+// 	// interaction with circle colliders
+// 	i = 0;
+// 	while (i < nCircleColliders){
+// 		v = float2(node.x - circleCollidersBuffer[i].x, node.y - circleCollidersBuffer[i].y);		// vector: circle collider center -> node
+// 		if (distance(float2(0, 0), v) < circleCollidersBuffer[i].r){
+// 			// move the node outside the circle
+// 			newPos = float2(circleCollidersBuffer[i].x, circleCollidersBuffer[i].y) + normalize(v) * circleCollidersBuffer[i].r;
+// 			lineNodesBuffer[nodeIndex].x = newPos.x;
+// 			lineNodesBuffer[nodeIndex].y = newPos.y;
+// 			// remove from the node's velocity a part: projection to the node-center line, facing center; add this vel part to collider's dv
+// 			dotResult = dot(float2(node.vx, node.vy), normalize(v));
+// 			if (dotResult < 0){
+// 				velToCenterComponent = normalize(v) * dotResult;
+// 				lineNodesBuffer[nodeIndex].vx -= velToCenterComponent.x;
+// 				lineNodesBuffer[nodeIndex].vy -= velToCenterComponent.y;
+// 				// add this to collider's vel
+// 				InterlockedAdd(circleCollidersBuffer[i].dvx, (int)(velToCenterComponent.x * 10000));
+// 				InterlockedAdd(circleCollidersBuffer[i].dvy, (int)(velToCenterComponent.y * 10000));
+// 			}
+// 		}
+// 		i++;
+// 	}
+// }
+
+#pragma kernel interactionWithBoxColliders
+[numthreads(16,8,1)]
+void interactionWithBoxColliders(uint3 id : SV_DispatchThreadID) {
+    if (id.x >= nLines)
+        return;
+    if (id.y >= nNodesPerLine)
+        return;
+
+    unsigned int i, nodeIndex;
+    float2 v, newPos, velToCenterComponent;
+    float2 halfSize, boxCenter;
+    LineNode node;
+    nodeIndex = id.x * nNodesPerLine + id.y;
+    node = lineNodesBuffer[nodeIndex];
+
+    // Interaction with box colliders
+    i = 0;
+    while (i < nBoxColliders) {
+        // Get the center and half-size of the box collider
+        boxCenter = float2(boxCollidersBuffer[i].x, boxCollidersBuffer[i].y);
+        halfSize = float2(boxCollidersBuffer[i].halfWidth, boxCollidersBuffer[i].halfHeight);
+
+        // Calculate the vector from the box center to the node
+        v = float2(node.x - boxCenter.x, node.y - boxCenter.y);
+
+        // Check if the node is inside the box collider
+        if (abs(v.x) < halfSize.x && abs(v.y) < halfSize.y) {
+            // Determine the minimum distance to move the node outside the box
+            float2 penetrationDepth = halfSize - abs(v);
+
+            if (penetrationDepth.x < penetrationDepth.y) {
+                newPos.x = boxCenter.x + (v.x > 0 ? halfSize.x : -halfSize.x);
+                newPos.y = node.y; // Keep the y position the same
+            } else {
+                newPos.x = node.x; // Keep the x position the same
+                newPos.y = boxCenter.y + (v.y > 0 ? halfSize.y : -halfSize.y);
+            }
+
+            // Update the node's position
+            lineNodesBuffer[nodeIndex].x = newPos.x;
+            lineNodesBuffer[nodeIndex].y = newPos.y;
+
+            // Calculate the velocity component in the direction of the normal
+            float2 normal = normalize(newPos - float2(node.x, node.y));
+            float dotResult = dot(float2(node.vx, node.vy), normal);
+            if (dotResult < 0) {
+                velToCenterComponent = normal * dotResult;
+                
+                // Subtract this component from the node's velocity
+                lineNodesBuffer[nodeIndex].vx -= velToCenterComponent.x;
+                lineNodesBuffer[nodeIndex].vy -= velToCenterComponent.y;
+
+                // Add this component to the box collider's velocity (scaled by 10000 for fixed-point arithmetic)
+            }
+        }
+        i++;
+    }
+}
+
+int3 GetScreenPositionInt(float3 worldPosition)
+{
+    float4 clipPos = mul(viewProjMatrix, float4(worldPosition, 1.0));
+    float3 ndc = clipPos.xyz / clipPos.w;
+
+    float2 screenPos = ((ndc.xy + 1.0) * 0.5) * gravityScreenResolution;
+
+    return int3(screenPos, 0.0);
+}
+
+float2 ComputeExternalForces(float gravityValue)
+{
+    if (abs(gravityValue - 0.2f) < 0.05)
+    {
+        return float2(0, gravityForce);
+    }
+    else if (abs(gravityValue - 0.4f) < 0.05)
+    {
+        return float2(0, -gravityForce);
+    }
+    else if (abs(gravityValue - 0.6f) < 0.05)
+    {
+        return float2(-gravityForce, 0);
+    }
+    else if (abs(gravityValue - 0.8f) < 0.05)
+    {
+        return float2(gravityForce, 0);
+    }
+    else
+    {
+        return float2(0,gravityForce);
+    }
+}
+
+float2 GravityColorToDirection(float4 color)
+{
+	float2 direction = float2(0, 0);
+
+	float yellowness = max(0, color.r * color.g - color.b);
+	float redness = max(0, color.r * color.r - yellowness);
+	float blueness = max(0, color.b * color.b - yellowness);
+	float greenness = max(0, color.g * color.g - yellowness);
+	return yellowness * float2(0, 1) + redness * float2(1, 0) + blueness * float2(-1, 0) + greenness * float2(0, -1);
+}
+
+#pragma kernel calcApply
+[numthreads(16,8,1)]
+void calcApply (uint3 id : SV_DispatchThreadID)
+{
+	if (id.x >= nLines)
+		return;
+	if (id.y >= nNodesPerLine)
+		return;
+	
+	int nodeIndex;
+	LineNode node;
+	nodeIndex = id.x * nNodesPerLine + id.y;
+	// debugBuffer[0] = 2;
+	// debugBuffer[nodeIndex] = 1;
+	node = lineNodesBuffer[nodeIndex];
+
+	if (id.y == 0) //* fixing the first node of the line
+	{
+		lineNodesBuffer[nodeIndex].x = linePivotsBuffer[id.x].x;
+		lineNodesBuffer[nodeIndex].y = linePivotsBuffer[id.x].y;
+		lineNodesBuffer[nodeIndex].vx = 0;
+		lineNodesBuffer[nodeIndex].vy = 0;
+		return;
+	}
+
+	if(id.y == nNodesPerLine - 1 && !(lineEndsPivotsBuffer[id.x].x == 0 && lineEndsPivotsBuffer[id.x].y == 0)) //* if line as an end point
+	{
+		lineNodesBuffer[nodeIndex].x = lineEndsPivotsBuffer[id.x].x;
+		lineNodesBuffer[nodeIndex].y = lineEndsPivotsBuffer[id.x].y;
+		lineNodesBuffer[nodeIndex].vx = 0;
+		lineNodesBuffer[nodeIndex].vy = 0;
+		return;
+	}
+
+	
+	// float value = GravityMap.Load(int3(lineNodesBuffer[nodeIndex].x + gravityOffset.x, lineNodesBuffer[nodeIndex].y + gravityOffset.y, 0)).r;
+	// float2 gravity = ComputeExternalForces(value) * 0.1;
+	float3 worldPos = float3(lineNodesBuffer[nodeIndex].x, lineNodesBuffer[nodeIndex].y, 0);
+	
+	float2 forces = float2(0, 0);
+	//* Gravity force
+	forces += GravityColorToDirection(GravityRT.Load(GetScreenPositionInt(worldPos))) * 0.1;
+	//* Wind force
+	forces += GravityColorToDirection(VelocityRT.Load(GetScreenPositionInt(worldPos))) * windForce;
+
+
+	lineNodesBuffer[nodeIndex].vx += forces.x;
+    lineNodesBuffer[nodeIndex].vy += forces.y;
+
+
+	lineNodesBuffer[nodeIndex].vx += dVelRate * I_TO_F * node.dvx;
+	lineNodesBuffer[nodeIndex].vy += dVelRate * I_TO_F * node.dvy;
+	lineNodesBuffer[nodeIndex].x += dPosRate * node.vx;
+	lineNodesBuffer[nodeIndex].y += dPosRate * node.vy;
+
+	lineNodesBuffer[nodeIndex].dvx = 0;
+	lineNodesBuffer[nodeIndex].dvy = 0;
+
+	lineNodesBuffer[nodeIndex].vx *= 0.9999;
+	lineNodesBuffer[nodeIndex].vy *= 0.9999;
+}
+
+#pragma kernel visInternodeLines
+[numthreads(16,8,1)]
+void visInternodeLines (uint3 id : SV_DispatchThreadID){
+	uint nodeIndex = id.x * nNodesPerLine + id.y;
+	int x, y, x2, y2;
+	int d;
+    uint pixelx, pixely, i, nSteps;
+	int2 v;
+	x = lineNodesBuffer[nodeIndex].x;
+	y = lineNodesBuffer[nodeIndex].y;
+	if (id.x >= nLines)
+		return;
+	if (id.y >= nNodesPerLine)
+		return;
+	pixelx = 512 + x;
+	pixely = 512 + y;
+	//InterlockedAdd(visBuffer[pixely * 1024 + pixelx], 255);
+	if (id.y == nNodesPerLine - 1)
+		return;
+	x2 = lineNodesBuffer[nodeIndex + 1].x;
+	y2 = lineNodesBuffer[nodeIndex + 1].y;
+	v = int2(x2, y2) - int2(x, y);
+	d = distance(int2(x2, y2), int2(x, y));
+	nSteps = 2 * d;
+	i = 0;
+	while (i < nSteps){
+		pixelx = 512 + x + i * v.x / nSteps;
+		pixely = 512 + y + i * v.y / nSteps;
+		if (pixelx >= 0 && pixelx < 1024 && pixely >= 0 && pixely < 1024){
+			InterlockedAdd(visBuffer[pixely * 1024 + pixelx], 15);
+		}
+		i++;
+	}
+}
+
+#pragma kernel pixelsToTexture
+[numthreads(32,32,1)]
+void pixelsToTexture (uint3 id : SV_DispatchThreadID){
+	int alphaInt;
+	float alphaFloat;
+	alphaInt = visBuffer[id.y * 1024 + id.x];
+	if (alphaInt > 0){
+		alphaInt += 80;
+		if (alphaInt >= 256)
+			alphaInt = 256;
+		alphaFloat = (float)alphaInt / 256.0;
+		renderTexture[id.xy] = float4(1, 1, 1, alphaFloat);
+	}
+	else{
+		renderTexture[id.xy] = float4(0, 0, 0, 0);
+	}
+}
+
+#pragma kernel clearPixels
+[numthreads(32,32,1)]
+void clearPixels (uint3 id : SV_DispatchThreadID){
+	visBuffer[id.y * 1024 + id.x] = 0;
+}
+
+#pragma kernel clearTexture
+[numthreads(32,32,1)]
+void clearTexture (uint3 id : SV_DispatchThreadID){
+	renderTexture[id.xy] = float4(0, 0, 0, 0);
+}
+
+#pragma kernel oneThreadAction
+[numthreads(1,1,1)]
+void oneThreadAction (uint3 id : SV_DispatchThreadID){
+	// debugBuffer[0] = 2;
+	float2 currentPivot = float2(lineNodesBuffer[id.x * nNodesPerLine].x, lineNodesBuffer[id.x * nNodesPerLine].y);
+	debugBuffer[id.x] = id.x;
+	if (distance(linePivotsBuffer[id.x], currentPivot) > 0.2)
+	{
+		// pivotActual[0] += 0.2 * normalize(pivotDestination - pivotActual[0]);
+		lineNodesBuffer[id.x * nNodesPerLine].x += 0.2 * normalize(linePivotsBuffer[id.x] - currentPivot).x;
+		lineNodesBuffer[id.x * nNodesPerLine].y += 0.2 * normalize(linePivotsBuffer[id.x] - currentPivot).y;
+	}
+}
